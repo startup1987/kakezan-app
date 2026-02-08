@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>かけざん れんしゅう</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; user-select: none; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .animate-bounce { animation: bounce 1s infinite; }
+    </style>
+</head>
+<body class="bg-gradient-to-b from-cyan-100 to-blue-200 min-h-screen">
+    <div id="app"></div>
+
+    <script>
+        // データ構造
+        const ANIMALS = [
+            { id: 'cat', name: 'ネコ', emoji: '🐱', condition: 'はじめての10もん' },
+            { id: 'dog', name: 'イヌ', emoji: '🐶', condition: 'ぜんぶせいかい！' },
+            { id: 'rabbit', name: 'ウサギ', emoji: '🐰', condition: '5もんれんぞく' },
+            { id: 'panda', name: 'パンダ', emoji: '🐼', condition: '3かいプレイ' },
+            { id: 'bear', name: 'クマ', emoji: '🐻', condition: 'にがてをせいかい' },
+            { id: 'fox', name: 'キツネ', emoji: '🦊', condition: '20もんクリア' },
+            { id: 'lion', name: 'ライオン', emoji: '🦁', condition: '30もんクリア' },
+            { id: 'tiger', name: 'トラ', emoji: '🐯', condition: 'じこベストこうしん' },
+            { id: 'koala', name: 'コアラ', emoji: '🐨', condition: '2かれんぞく' },
+            { id: 'pig', name: 'ブタ', emoji: '🐷', condition: '50もんせいかい' },
+            { id: 'cow', name: 'ウシ', emoji: '🐮', condition: '100もんせいかい' },
+            { id: 'monkey', name: 'サル', emoji: '🐵', condition: '7のだんマスター' },
+            { id: 'chicken', name: 'ニワトリ', emoji: '🐔', condition: '5かれんぞく' },
+            { id: 'penguin', name: 'ペンギン', emoji: '🐧', condition: 'ひっさんチャレンジ' },
+            { id: 'frog', name: 'カエル', emoji: '🐸', condition: '10もん10びょう' },
+            { id: 'turtle', name: 'カメ', emoji: '🐢', condition: 'じっくりがんばった' },
+            { id: 'elephant', name: 'ゾウ', emoji: '🐘', condition: '200もんせいかい' },
+            { id: 'giraffe', name: 'キリン', emoji: '🦒', condition: '8のだんマスター' },
+            { id: 'zebra', name: 'シマウマ', emoji: '🦓', condition: '9のだんマスター' },
+            { id: 'dolphin', name: 'イルカ', emoji: '🐬', condition: 'ぜんぶコンプリート！' },
+        ];
+
+        // アプリの状態
+        let state = {
+            screen: 'home',
+            mode: 'kuku',
+            questionCount: 10,
+            questions: [],
+            currentIndex: 0,
+            answers: [],
+            startTime: 0,
+            input: '',
+            feedback: '',
+            attempts: 0,
+            userData: loadUserData()
+        };
+
+        // ローカルストレージ
+        function loadUserData() {
+            const stored = localStorage.getItem('kakezan-data');
+            if (stored) return JSON.parse(stored);
+            return {
+                animals: ANIMALS.map(a => ({ ...a, unlocked: false })),
+                stats: {
+                    totalSessions: 0,
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    incorrectAnswers: 0,
+                    bestTime: 0,
+                    bestAccuracy: 0,
+                    wrongQuestions: [],
+                    lastPlayedDate: '',
+                    consecutiveDays: 0
+                },
+                sessions: []
+            };
+        }
+
+        function saveUserData() {
+            localStorage.setItem('kakezan-data', JSON.stringify(state.userData));
+        }
+
+        // 問題生成
+        function generateQuestions(mode, count) {
+            const questions = [];
+            for (let i = 0; i < count; i++) {
+                if (mode === 'kuku') {
+                    const num1 = Math.floor(Math.random() * 9) + 1;
+                    const num2 = Math.floor(Math.random() * 9) + 1;
+                    questions.push({ num1, num2, answer: num1 * num2 });
+                } else {
+                    const num1 = Math.floor(Math.random() * 90) + 10;
+                    const num2 = Math.floor(Math.random() * 9) + 1;
+                    questions.push({ num1, num2, answer: num1 * num2 });
+                }
+            }
+            return questions;
+        }
+
+        // 励ましメッセージ
+        function getEncouragement(isCorrect) {
+            if (isCorrect) {
+                const msgs = ['いいね！', 'すごい！', 'せいかい！', 'やったね！', 'はやい！', 'バッチリ！', 'さすが！'];
+                return msgs[Math.floor(Math.random() * msgs.length)];
+            }
+            return ['つぎいこう！', 'おしい！', 'がんばろう！'][Math.floor(Math.random() * 3)];
+        }
+
+        // 時間フォーマット
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+        }
+
+        // クイズ開始
+        function startQuiz(mode, count) {
+            state.mode = mode;
+            state.questionCount = count;
+            state.questions = generateQuestions(mode, count);
+            state.currentIndex = 0;
+            state.answers = Array(count).fill(null);
+            state.startTime = Date.now();
+            state.input = '';
+            state.feedback = '';
+            state.attempts = 0;
+            state.screen = 'quiz';
+            render();
+        }
+
+        // 回答処理
+        function handleAnswer(value) {
+            const q = state.questions[state.currentIndex];
+            const isCorrect = value === q.answer;
+
+            if (isCorrect) {
+                state.feedback = getEncouragement(true);
+                state.answers[state.currentIndex] = value;
+                setTimeout(() => {
+                    state.feedback = '';
+                    state.input = '';
+                    state.attempts = 0;
+                    if (state.currentIndex < state.questions.length - 1) {
+                        state.currentIndex++;
+                        render();
+                    } else {
+                        completeQuiz();
+                    }
+                }, 1000);
+            } else {
+                state.feedback = getEncouragement(false);
+                state.attempts++;
+                if (state.attempts >= 3) {
+                    state.answers[state.currentIndex] = null;
+                    setTimeout(() => {
+                        state.feedback = '';
+                        state.input = '';
+                        state.attempts = 0;
+                        if (state.currentIndex < state.questions.length - 1) {
+                            state.currentIndex++;
+                            render();
+                        } else {
+                            completeQuiz();
+                        }
+                    }, 1500);
+                } else {
+                    setTimeout(() => {
+                        state.feedback = '';
+                        state.input = '';
+                        render();
+                    }, 1000);
+                }
+            }
+            render();
+        }
+
+        // クイズ完了
+        function completeQuiz() {
+            const endTime = Date.now();
+            const correctCount = state.answers.filter((a, i) => a === state.questions[i].answer).length;
+            const totalTime = Math.floor((endTime - state.startTime) / 1000);
+            const accuracy = Math.round((correctCount / state.questions.length) * 100);
+
+            // 統計更新
+            const today = new Date().toDateString();
+            let consecutiveDays = state.userData.stats.consecutiveDays;
+            if (state.userData.stats.lastPlayedDate !== today) {
+                const lastDate = new Date(state.userData.stats.lastPlayedDate);
+                const todayDate = new Date(today);
+                const diffDays = Math.floor((todayDate - lastDate) / (1000 * 60 * 60 * 24));
+                if (diffDays === 1) {
+                    consecutiveDays++;
+                } else if (diffDays > 1 || !state.userData.stats.lastPlayedDate) {
+                    consecutiveDays = 1;
+                }
+            }
+
+            const wrongQuestions = state.questions.filter((q, i) => state.answers[i] !== q.answer);
+
+            state.userData.stats = {
+                totalSessions: state.userData.stats.totalSessions + 1,
+                totalQuestions: state.userData.stats.totalQuestions + state.questions.length,
+                correctAnswers: state.userData.stats.correctAnswers + correctCount,
+                incorrectAnswers: state.userData.stats.incorrectAnswers + (state.questions.length - correctCount),
+                bestTime: state.userData.stats.bestTime === 0 || totalTime < state.userData.stats.bestTime ? totalTime : state.userData.stats.bestTime,
+                bestAccuracy: Math.max(state.userData.stats.bestAccuracy, accuracy),
+                wrongQuestions: [...state.userData.stats.wrongQuestions, ...wrongQuestions].slice(-50),
+                lastPlayedDate: today,
+                consecutiveDays
+            };
+
+            // 動物カード解放
+            const newAnimals = checkUnlockAnimals(correctCount, accuracy);
+
+            saveUserData();
+            state.screen = 'result';
+            state.newAnimals = newAnimals;
+            state.endTime = endTime;
+            render();
+        }
+
+        // 動物カード解放チェック
+        function checkUnlockAnimals(correctCount, accuracy) {
+            const newUnlocked = [];
+            const stats = state.userData.stats;
+
+            const conditions = {
+                cat: stats.totalSessions >= 1,
+                dog: correctCount === state.questions.length,
+                rabbit: hasConsecutiveCorrect(5),
+                panda: stats.totalSessions >= 3,
+                fox: state.questions.length >= 20 && correctCount >= 18,
+                lion: state.questions.length >= 30 && correctCount >= 27,
+                koala: stats.consecutiveDays >= 2,
+                pig: stats.correctAnswers >= 50,
+                cow: stats.correctAnswers >= 100,
+                chicken: stats.consecutiveDays >= 5
+            };
+
+            state.userData.animals = state.userData.animals.map(animal => {
+                if (!animal.unlocked && conditions[animal.id]) {
+                    newUnlocked.push(animal.emoji);
+                    return { ...animal, unlocked: true, unlockedAt: Date.now() };
+                }
+                return animal;
+            });
+
+            return newUnlocked;
+        }
+
+        function hasConsecutiveCorrect(count) {
+            let consecutive = 0;
+            for (let i = 0; i < state.answers.length; i++) {
+                if (state.answers[i] === state.questions[i].answer) {
+                    consecutive++;
+                    if (consecutive >= count) return true;
+                } else {
+                    consecutive = 0;
+                }
+            }
+            return false;
+        }
+
+        // 数字パッド
+        function NumberPad() {
+            return `
+                <div class="w-full max-w-md mx-auto">
+                    <div class="bg-white border-4 border-gray-300 rounded-2xl p-6 mb-4 min-h-[80px] flex items-center justify-center">
+                        <span class="text-5xl font-bold text-gray-800">${state.input || '?'}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3 mb-3">
+                        ${[1,2,3,4,5,6,7,8,9].map(n => `
+                            <button onclick="addDigit(${n})" class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white text-4xl font-bold rounded-xl h-20">
+                                ${n}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button onclick="deleteDigit()" class="bg-gray-400 hover:bg-gray-500 active:bg-gray-600 text-white text-2xl font-bold rounded-xl h-20">⌫</button>
+                        <button onclick="addDigit(0)" class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white text-4xl font-bold rounded-xl h-20">0</button>
+                        <button onclick="submitAnswer()" ${!state.input ? 'disabled' : ''} class="${state.input ? 'bg-green-500 hover:bg-green-600 active:bg-green-700' : 'bg-gray-300'} text-white text-2xl font-bold rounded-xl h-20">けってい</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function addDigit(n) {
+            if (state.input.length < 4) {
+                state.input += n;
+                render();
+            }
+        }
+
+        function deleteDigit() {
+            state.input = state.input.slice(0, -1);
+            render();
+        }
+
+        function submitAnswer() {
+            if (state.input) {
+                handleAnswer(parseInt(state.input));
+            }
+        }
+
+        // 画面レンダリング
+        function render() {
+            const app = document.getElementById('app');
+
+            if (state.screen === 'home') {
+                app.innerHTML = HomeScreen();
+            } else if (state.screen === 'quiz') {
+                app.innerHTML = QuizScreen();
+            } else if (state.screen === 'result') {
+                app.innerHTML = ResultScreen();
+            } else if (state.screen === 'collection') {
+                app.innerHTML = CollectionScreen();
+            } else if (state.screen === 'stats') {
+                app.innerHTML = StatsScreen();
+            }
+        }
+
+        function HomeScreen() {
+            const unlockedCount = state.userData.animals.filter(a => a.unlocked).length;
+            const totalAccuracy = state.userData.stats.totalQuestions > 0
+                ? Math.round((state.userData.stats.correctAnswers / state.userData.stats.totalQuestions) * 100)
+                : 0;
+
+            return `
+                <div class="max-w-2xl mx-auto p-4">
+                    <h1 class="text-5xl font-bold text-center mb-4 text-gray-800 mt-8">かけざん れんしゅう</h1>
+                    <div class="text-center text-xl text-gray-600 mb-8">たのしく まなぼう！</div>
+
+                    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                                <div class="text-3xl font-bold text-blue-600">${unlockedCount}</div>
+                                <div class="text-sm text-gray-600">どうぶつ</div>
+                            </div>
+                            <div>
+                                <div class="text-3xl font-bold text-green-600">${totalAccuracy}%</div>
+                                <div class="text-sm text-gray-600">せいかいりつ</div>
+                            </div>
+                            <div>
+                                <div class="text-3xl font-bold text-orange-600">${state.userData.stats.consecutiveDays}</div>
+                                <div class="text-sm text-gray-600">れんぞく</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 mb-6">
+                        <div class="bg-white rounded-2xl shadow-lg p-6">
+                            <h2 class="text-2xl font-bold mb-4 text-gray-800">九九スピードれんしゅう</h2>
+                            <div class="grid grid-cols-3 gap-3">
+                                <button onclick="startQuiz('kuku', 10)" class="bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold py-4 rounded-xl">10もん</button>
+                                <button onclick="startQuiz('kuku', 20)" class="bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold py-4 rounded-xl">20もん</button>
+                                <button onclick="startQuiz('kuku', 30)" class="bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold py-4 rounded-xl">30もん</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-lg p-6">
+                            <h2 class="text-2xl font-bold mb-4 text-gray-800">ひっさんチャレンジ</h2>
+                            <div class="grid grid-cols-3 gap-3">
+                                <button onclick="startQuiz('hissan', 10)" class="bg-purple-500 hover:bg-purple-600 text-white text-xl font-bold py-4 rounded-xl">10もん</button>
+                                <button onclick="startQuiz('hissan', 20)" class="bg-purple-500 hover:bg-purple-600 text-white text-xl font-bold py-4 rounded-xl">20もん</button>
+                                <button onclick="startQuiz('hissan', 30)" class="bg-purple-500 hover:bg-purple-600 text-white text-xl font-bold py-4 rounded-xl">30もん</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="goToCollection()" class="bg-green-500 hover:bg-green-600 text-white text-xl font-bold py-6 rounded-xl">🐾 コレクション</button>
+                        <button onclick="goToStats()" class="bg-yellow-500 hover:bg-yellow-600 text-white text-xl font-bold py-6 rounded-xl">📊 きろく</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function QuizScreen() {
+            const q = state.questions[state.currentIndex];
+            const progress = state.currentIndex + 1;
+            const progressPercent = (progress / state.questionCount) * 100;
+
+            return `
+                <div class="min-h-screen bg-gradient-to-b from-blue-100 to-purple-100 p-4">
+                    <div class="max-w-2xl mx-auto">
+                        <div class="flex justify-between items-center mb-6">
+                            <button onclick="goHome()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl text-lg font-bold">◀ もどる</button>
+                            <div class="text-2xl font-bold text-gray-800">${progress} / ${state.questionCount}</div>
+                        </div>
+
+                        <div class="bg-white rounded-full h-4 mb-8 overflow-hidden">
+                            <div class="bg-green-500 h-full transition-all duration-500" style="width: ${progressPercent}%"></div>
+                        </div>
+
+                        <div class="bg-white rounded-3xl shadow-xl p-8 mb-6">
+                            <div class="text-center mb-8">
+                                <div class="text-7xl font-bold text-gray-800 mb-4">${q.num1} × ${q.num2}</div>
+                                <div class="text-4xl text-gray-600">= ?</div>
+                            </div>
+
+                            ${state.feedback ? `
+                                <div class="text-center text-3xl font-bold mb-4 ${state.feedback.includes('いいね') || state.feedback.includes('すごい') || state.feedback.includes('せいかい') || state.feedback.includes('やった') || state.feedback.includes('はやい') || state.feedback.includes('バッチリ') || state.feedback.includes('さすが') ? 'text-green-600' : 'text-orange-600'}">
+                                    ${state.feedback}
+                                </div>
+                            ` : NumberPad()}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function ResultScreen() {
+            const correctCount = state.answers.filter((a, i) => a === state.questions[i].answer).length;
+            const totalTime = Math.floor((state.endTime - state.startTime) / 1000);
+            const accuracy = Math.round((correctCount / state.questions.length) * 100);
+
+            return `
+                <div class="min-h-screen bg-gradient-to-b from-yellow-100 to-orange-100 p-4">
+                    <div class="max-w-2xl mx-auto">
+                        <div class="bg-white rounded-3xl shadow-xl p-8 mb-6">
+                            <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">おつかれさま！</h1>
+
+                            <div class="grid grid-cols-3 gap-4 mb-8">
+                                <div class="bg-blue-100 rounded-2xl p-6 text-center">
+                                    <div class="text-5xl font-bold text-blue-600 mb-2">${correctCount}</div>
+                                    <div class="text-lg text-gray-700">せいかい</div>
+                                </div>
+                                <div class="bg-green-100 rounded-2xl p-6 text-center">
+                                    <div class="text-5xl font-bold text-green-600 mb-2">${accuracy}%</div>
+                                    <div class="text-lg text-gray-700">せいかいりつ</div>
+                                </div>
+                                <div class="bg-purple-100 rounded-2xl p-6 text-center">
+                                    <div class="text-4xl font-bold text-purple-600 mb-2">${formatTime(totalTime)}</div>
+                                    <div class="text-lg text-gray-700">タイム</div>
+                                </div>
+                            </div>
+
+                            ${state.newAnimals && state.newAnimals.length > 0 ? `
+                                <div class="bg-gradient-to-r from-pink-100 to-yellow-100 rounded-2xl p-6 mb-6">
+                                    <div class="text-2xl font-bold text-center mb-4 text-gray-800">🎉 あたらしいカードをゲット！</div>
+                                    <div class="flex justify-center gap-4 flex-wrap">
+                                        ${state.newAnimals.map(emoji => `<div class="text-6xl animate-bounce">${emoji}</div>`).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <div class="text-center mb-6">
+                                <p class="text-2xl text-gray-700">
+                                    ${accuracy === 100 ? 'かんぺき！すごいぞ！' : accuracy >= 80 ? 'よくがんばったね！' : accuracy >= 60 ? 'いいちょうし！つづけよう！' : 'つぎはもっとよくなるよ！'}
+                                </p>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <button onclick="startQuiz('${state.mode}', ${state.questionCount})" class="bg-blue-500 hover:bg-blue-600 text-white text-2xl font-bold py-4 rounded-xl">もういちど</button>
+                                <button onclick="goHome()" class="bg-green-500 hover:bg-green-600 text-white text-2xl font-bold py-4 rounded-xl">ホームへ</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function CollectionScreen() {
+            const unlockedCount = state.userData.animals.filter(a => a.unlocked).length;
+
+            return `
+                <div class="min-h-screen bg-gradient-to-b from-green-100 to-blue-100 p-4">
+                    <div class="max-w-4xl mx-auto">
+                        <div class="flex justify-between items-center mb-6">
+                            <button onclick="goHome()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl text-lg font-bold">◀ もどる</button>
+                            <div class="text-2xl font-bold text-gray-800">${unlockedCount} / ${state.userData.animals.length}</div>
+                        </div>
+
+                        <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">どうぶつコレクション</h1>
+
+                        <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            ${state.userData.animals.map(animal => `
+                                <div class="${animal.unlocked ? 'bg-white' : 'bg-gray-300'} rounded-2xl p-4 shadow-lg transition-transform hover:scale-105">
+                                    <div class="text-6xl text-center mb-2">${animal.unlocked ? animal.emoji : '❓'}</div>
+                                    <div class="text-center">
+                                        <div class="text-lg font-bold mb-1 ${animal.unlocked ? 'text-gray-800' : 'text-gray-500'}">${animal.unlocked ? animal.name : '???'}</div>
+                                        <div class="text-xs ${animal.unlocked ? 'text-gray-600' : 'text-gray-400'}">${animal.condition}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        ${unlockedCount < state.userData.animals.length ? `
+                            <div class="mt-8 bg-white rounded-2xl p-6 text-center">
+                                <p class="text-xl text-gray-700">れんしゅうをつづけて、すべてのどうぶつをあつめよう！</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function StatsScreen() {
+            const stats = state.userData.stats;
+            const totalAccuracy = stats.totalQuestions > 0 ? Math.round((stats.correctAnswers / stats.totalQuestions) * 100) : 0;
+
+            const weakTables = {};
+            stats.wrongQuestions.forEach(q => {
+                if (q.num1 <= 9 && q.num2 <= 9) {
+                    weakTables[q.num2] = (weakTables[q.num2] || 0) + 1;
+                }
+            });
+            const topWeak = Object.entries(weakTables).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+            return `
+                <div class="min-h-screen bg-gradient-to-b from-purple-100 to-pink-100 p-4">
+                    <div class="max-w-2xl mx-auto">
+                        <div class="mb-6">
+                            <button onclick="goHome()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl text-lg font-bold">◀ もどる</button>
+                        </div>
+
+                        <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">きろく</h1>
+
+                        <div class="bg-white rounded-3xl shadow-xl p-6 mb-6">
+                            <h2 class="text-2xl font-bold mb-4 text-gray-800">がんばりきろく</h2>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-blue-50 rounded-xl p-4">
+                                    <div class="text-sm text-gray-600 mb-1">ぜんぶのもんだい</div>
+                                    <div class="text-3xl font-bold text-blue-600">${stats.totalQuestions}</div>
+                                </div>
+                                <div class="bg-green-50 rounded-xl p-4">
+                                    <div class="text-sm text-gray-600 mb-1">せいかいりつ</div>
+                                    <div class="text-3xl font-bold text-green-600">${totalAccuracy}%</div>
+                                </div>
+                                <div class="bg-purple-50 rounded-xl p-4">
+                                    <div class="text-sm text-gray-600 mb-1">プレイかいすう</div>
+                                    <div class="text-3xl font-bold text-purple-600">${stats.totalSessions}</div>
+                                </div>
+                                <div class="bg-orange-50 rounded-xl p-4">
+                                    <div class="text-sm text-gray-600 mb-1">れんぞくにっすう</div>
+                                    <div class="text-3xl font-bold text-orange-600">${stats.consecutiveDays}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${stats.bestTime > 0 ? `
+                            <div class="bg-white rounded-3xl shadow-xl p-6 mb-6">
+                                <h2 class="text-2xl font-bold mb-4 text-gray-800">ベストきろく</h2>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-yellow-50 rounded-xl p-4">
+                                        <div class="text-sm text-gray-600 mb-1">さいこうせいかいりつ</div>
+                                        <div class="text-3xl font-bold text-yellow-600">${stats.bestAccuracy}%</div>
+                                    </div>
+                                    <div class="bg-pink-50 rounded-xl p-4">
+                                        <div class="text-sm text-gray-600 mb-1">さいたんタイム</div>
+                                        <div class="text-2xl font-bold text-pink-600">${formatTime(stats.bestTime)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${topWeak.length > 0 ? `
+                            <div class="bg-white rounded-3xl shadow-xl p-6 mb-6">
+                                <h2 class="text-2xl font-bold mb-4 text-gray-800">にがてなだん</h2>
+                                <div class="space-y-3">
+                                    ${topWeak.map(([table, count]) => `
+                                        <div class="bg-red-50 rounded-xl p-4 flex justify-between items-center">
+                                            <span class="text-xl font-bold text-gray-800">${table}のだん</span>
+                                            <span class="text-lg text-gray-600">まちがい ${count}かい</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ナビゲーション
+        function goHome() {
+            state.screen = 'home';
+            render();
+        }
+
+        function goToCollection() {
+            state.screen = 'collection';
+            render();
+        }
+
+        function goToStats() {
+            state.screen = 'stats';
+            render();
+        }
+
+        // 初回レンダリング
+        render();
+    </script>
+</body>
+</html>
