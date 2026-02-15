@@ -54,12 +54,58 @@
             input: '',
             feedback: '',
             attempts: 0,
+            soundEnabled: true,
             userData: loadUserData()
         };
+
+        // 音声機能（Web Audio API）
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(frequency, duration, type = 'sine') {
+            if (!state.soundEnabled) return;
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = frequency;
+            oscillator.type = type;
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function playCorrectSound() {
+            // ピロリーン♪（上昇音）
+            playSound(523.25, 0.1); // ド
+            setTimeout(() => playSound(659.25, 0.1), 100); // ミ
+            setTimeout(() => playSound(783.99, 0.2), 200); // ソ
+        }
+
+        function playIncorrectSound() {
+            // ブブー（下降音）
+            playSound(300, 0.15, 'sawtooth');
+            setTimeout(() => playSound(200, 0.25, 'sawtooth'), 150);
+        }
+
+        function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            localStorage.setItem('kakezan-sound', state.soundEnabled);
+            render();
+        }
 
         // ローカルストレージ
         function loadUserData() {
             const stored = localStorage.getItem('kakezan-data');
+            const soundSetting = localStorage.getItem('kakezan-sound');
+            if (soundSetting !== null) {
+                state.soundEnabled = soundSetting === 'true';
+            }
             if (stored) return JSON.parse(stored);
             return {
                 animals: ANIMALS.map(a => ({ ...a, unlocked: false })),
@@ -136,6 +182,7 @@
             const isCorrect = value === q.answer;
 
             if (isCorrect) {
+                playCorrectSound(); // 正解音を鳴らす
                 state.feedback = getEncouragement(true);
                 state.answers[state.currentIndex] = value;
                 setTimeout(() => {
@@ -150,6 +197,7 @@
                     }
                 }, 1000);
             } else {
+                playIncorrectSound(); // 不正解音を鳴らす
                 state.feedback = getEncouragement(false);
                 state.attempts++;
                 if (state.attempts >= 3) {
@@ -369,9 +417,16 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-2 gap-4 mb-4">
                         <button onclick="goToCollection()" class="bg-green-500 hover:bg-green-600 text-white text-xl font-bold py-6 rounded-xl">🐾 コレクション</button>
                         <button onclick="goToStats()" class="bg-yellow-500 hover:bg-yellow-600 text-white text-xl font-bold py-6 rounded-xl">📊 きろく</button>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-lg p-4">
+                        <button onclick="toggleSound()" class="w-full flex items-center justify-between text-lg font-bold text-gray-800">
+                            <span>おとエフェクト</span>
+                            <span class="text-2xl">${state.soundEnabled ? '🔊 ON' : '🔇 OFF'}</span>
+                        </button>
                     </div>
                 </div>
             `;
