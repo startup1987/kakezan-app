@@ -99,6 +99,102 @@
             render();
         }
 
+        function playAnimalSound(animalId) {
+            if (!state.soundEnabled) return;
+
+            // 各動物に特徴的な音を割り当て
+            const sounds = {
+                cat: () => { // ネコ：ニャーン
+                    playSound(800, 0.15, 'sine');
+                    setTimeout(() => playSound(600, 0.2, 'sine'), 150);
+                },
+                dog: () => { // イヌ：ワンワン
+                    playSound(300, 0.15, 'sawtooth');
+                    setTimeout(() => playSound(300, 0.15, 'sawtooth'), 200);
+                },
+                rabbit: () => { // ウサギ：軽快な音
+                    playSound(1000, 0.08, 'sine');
+                    setTimeout(() => playSound(1200, 0.08, 'sine'), 100);
+                },
+                panda: () => { // パンダ：のんびりした音
+                    playSound(400, 0.2, 'triangle');
+                    setTimeout(() => playSound(350, 0.2, 'triangle'), 250);
+                },
+                bear: () => { // クマ：低い音
+                    playSound(200, 0.3, 'sawtooth');
+                },
+                fox: () => { // キツネ：高めの音
+                    playSound(700, 0.12, 'sine');
+                    setTimeout(() => playSound(900, 0.12, 'sine'), 120);
+                    setTimeout(() => playSound(700, 0.15, 'sine'), 240);
+                },
+                lion: () => { // ライオン：力強い音
+                    playSound(250, 0.25, 'sawtooth');
+                    setTimeout(() => playSound(200, 0.3, 'sawtooth'), 250);
+                },
+                tiger: () => { // トラ：迫力ある音
+                    playSound(280, 0.2, 'sawtooth');
+                    setTimeout(() => playSound(220, 0.25, 'sawtooth'), 200);
+                },
+                koala: () => { // コアラ：かわいい音
+                    playSound(900, 0.15, 'sine');
+                    setTimeout(() => playSound(800, 0.15, 'sine'), 150);
+                },
+                pig: () => { // ブタ：ブーブー
+                    playSound(400, 0.15, 'square');
+                    setTimeout(() => playSound(450, 0.15, 'square'), 200);
+                },
+                cow: () => { // ウシ：モーモー
+                    playSound(300, 0.25, 'sawtooth');
+                    setTimeout(() => playSound(280, 0.25, 'sawtooth'), 300);
+                },
+                monkey: () => { // サル：キャッキャッ
+                    playSound(1000, 0.1, 'sine');
+                    setTimeout(() => playSound(1100, 0.1, 'sine'), 120);
+                    setTimeout(() => playSound(1000, 0.1, 'sine'), 240);
+                },
+                chicken: () => { // ニワトリ：コケコッコー
+                    playSound(800, 0.12, 'square');
+                    setTimeout(() => playSound(700, 0.12, 'square'), 140);
+                    setTimeout(() => playSound(800, 0.18, 'square'), 280);
+                },
+                penguin: () => { // ペンギン：コミカルな音
+                    playSound(600, 0.1, 'sine');
+                    setTimeout(() => playSound(500, 0.15, 'sine'), 120);
+                },
+                frog: () => { // カエル：ゲロゲロ
+                    playSound(500, 0.12, 'square');
+                    setTimeout(() => playSound(450, 0.12, 'square'), 150);
+                },
+                turtle: () => { // カメ：ゆっくりした音
+                    playSound(400, 0.25, 'triangle');
+                    setTimeout(() => playSound(380, 0.25, 'triangle'), 300);
+                },
+                elephant: () => { // ゾウ：重厚な音
+                    playSound(180, 0.3, 'sawtooth');
+                    setTimeout(() => playSound(150, 0.35, 'sawtooth'), 300);
+                },
+                giraffe: () => { // キリン：優雅な音
+                    playSound(700, 0.2, 'sine');
+                    setTimeout(() => playSound(650, 0.2, 'sine'), 220);
+                },
+                zebra: () => { // シマウマ：リズミカルな音
+                    playSound(600, 0.1, 'square');
+                    setTimeout(() => playSound(650, 0.1, 'square'), 120);
+                    setTimeout(() => playSound(600, 0.1, 'square'), 240);
+                },
+                dolphin: () => { // イルカ：高音の鳴き声
+                    playSound(1200, 0.1, 'sine');
+                    setTimeout(() => playSound(1400, 0.1, 'sine'), 100);
+                    setTimeout(() => playSound(1300, 0.15, 'sine'), 200);
+                }
+            };
+
+            if (sounds[animalId]) {
+                sounds[animalId]();
+            }
+        }
+
         // ローカルストレージ
         function loadUserData() {
             const stored = localStorage.getItem('kakezan-data');
@@ -532,7 +628,7 @@
 
                         <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                             ${state.userData.animals.map(animal => `
-                                <div class="${animal.unlocked ? 'bg-white' : 'bg-gray-300'} rounded-2xl p-4 shadow-lg transition-transform hover:scale-105">
+                                <div onclick="${animal.unlocked ? `playAnimalSound('${animal.id}')` : ''}" class="${animal.unlocked ? 'bg-white cursor-pointer' : 'bg-gray-300'} rounded-2xl p-4 shadow-lg transition-transform ${animal.unlocked ? 'hover:scale-110 active:scale-95' : ''}">
                                     <div class="text-6xl text-center mb-2">${animal.unlocked ? animal.emoji : '❓'}</div>
                                     <div class="text-center">
                                         <div class="text-lg font-bold mb-1 ${animal.unlocked ? 'text-gray-800' : 'text-gray-500'}">${animal.unlocked ? animal.name : '???'}</div>
