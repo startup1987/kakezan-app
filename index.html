@@ -53,8 +53,10 @@
             startTime: 0,
             input: '',
             feedback: '',
+            hint: '',
             attempts: 0,
             soundEnabled: true,
+            lessonSlide: 0,
             userData: loadUserData()
         };
 
@@ -178,11 +180,17 @@
                 if (mode === 'kuku') {
                     const num1 = Math.floor(Math.random() * 9) + 1;
                     const num2 = Math.floor(Math.random() * 9) + 1;
-                    questions.push({ num1, num2, answer: num1 * num2 });
+                    questions.push({ num1, num2, answer: num1 * num2, mode: 'kuku' });
+                } else if (mode === 'wari') {
+                    // 割り算：九九の範囲で割り切れる問題のみ
+                    const num2 = Math.floor(Math.random() * 9) + 1; // 割る数（1〜9）
+                    const answer = Math.floor(Math.random() * 9) + 1; // 答え（1〜9）
+                    const num1 = num2 * answer; // 割られる数（必ず割り切れる）
+                    questions.push({ num1, num2, answer, mode: 'wari' });
                 } else {
                     const num1 = Math.floor(Math.random() * 90) + 10;
                     const num2 = Math.floor(Math.random() * 9) + 1;
-                    questions.push({ num1, num2, answer: num1 * num2 });
+                    questions.push({ num1, num2, answer: num1 * num2, mode: 'hissan' });
                 }
             }
             return questions;
@@ -214,6 +222,7 @@
             state.startTime = Date.now();
             state.input = '';
             state.feedback = '';
+            state.hint = '';
             state.attempts = 0;
             state.screen = 'quiz';
             render();
@@ -243,8 +252,17 @@
                 playIncorrectSound(); // 不正解音を鳴らす
                 state.feedback = getEncouragement(false);
                 state.attempts++;
+
+                // 割り算のとき、2回目以降はヒントを表示
+                if (q.mode === 'wari' && state.attempts >= 2) {
+                    state.hint = `ヒント：${q.num2} × ？ = ${q.num1} を かんがえよう！（${q.num2}のだん）`;
+                } else {
+                    state.hint = '';
+                }
+
                 if (state.attempts >= 3) {
                     state.answers[state.currentIndex] = null;
+                    state.hint = '';
                     setTimeout(() => {
                         state.feedback = '';
                         state.input = '';
@@ -255,13 +273,13 @@
                         } else {
                             completeQuiz();
                         }
-                    }, 1500);
+                    }, 2500);
                 } else {
                     setTimeout(() => {
                         state.feedback = '';
                         state.input = '';
                         render();
-                    }, 1000);
+                    }, 1200);
                 }
             }
             render();
@@ -409,6 +427,8 @@
                 app.innerHTML = CollectionScreen();
             } else if (state.screen === 'stats') {
                 app.innerHTML = StatsScreen();
+            } else if (state.screen === 'lesson') {
+                app.innerHTML = LessonScreen();
             }
         }
 
@@ -447,6 +467,20 @@
                                 <button onclick="startQuiz('kuku', 10)" class="bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold py-4 rounded-xl">10もん</button>
                                 <button onclick="startQuiz('kuku', 20)" class="bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold py-4 rounded-xl">20もん</button>
                                 <button onclick="startQuiz('kuku', 30)" class="bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold py-4 rounded-xl">30もん</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-lg p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-2xl font-bold text-gray-800">わり算れんしゅう</h2>
+                                <button onclick="goToLesson()" class="bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-bold px-4 py-2 rounded-xl">
+                                    📖 べんきょうする
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <button onclick="startQuiz('wari', 10)" class="bg-orange-500 hover:bg-orange-600 text-white text-xl font-bold py-4 rounded-xl">10もん</button>
+                                <button onclick="startQuiz('wari', 20)" class="bg-orange-500 hover:bg-orange-600 text-white text-xl font-bold py-4 rounded-xl">20もん</button>
+                                <button onclick="startQuiz('wari', 30)" class="bg-orange-500 hover:bg-orange-600 text-white text-xl font-bold py-4 rounded-xl">30もん</button>
                             </div>
                         </div>
 
@@ -494,9 +528,19 @@
 
                         <div class="bg-white rounded-3xl shadow-xl p-8 mb-6">
                             <div class="text-center mb-8">
-                                <div class="text-7xl font-bold text-gray-800 mb-4">${q.num1} × ${q.num2}</div>
+                                <div class="text-7xl font-bold text-gray-800 mb-4">
+                                    ${q.mode === 'wari'
+                                        ? `${q.num1} ÷ ${q.num2}`
+                                        : `${q.num1} × ${q.num2}`}
+                                </div>
                                 <div class="text-4xl text-gray-600">= ?</div>
                             </div>
+
+                            ${state.hint ? `
+                                <div class="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-4 mb-4">
+                                    <div class="text-xl font-bold text-yellow-700">💡 ${state.hint}</div>
+                                </div>
+                            ` : ''}
 
                             ${state.feedback ? `
                                 <div class="text-center text-3xl font-bold mb-4 ${state.feedback.includes('いいね') || state.feedback.includes('すごい') || state.feedback.includes('せいかい') || state.feedback.includes('やった') || state.feedback.includes('はやい') || state.feedback.includes('バッチリ') || state.feedback.includes('さすが') ? 'text-green-600' : 'text-orange-600'}">
@@ -672,6 +716,128 @@
             `;
         }
 
+        // 割り算授業画面
+        function LessonScreen() {
+            const slides = [
+                {
+                    title: 'わり算って なあに？',
+                    content: `
+                        <div class="text-center">
+                            <div class="text-6xl mb-6">🍎🍎🍎🍎🍎🍎🍎🍎🍎🍎🍎🍎</div>
+                            <p class="text-2xl text-gray-700 mb-4">りんごが <span class="text-red-500 font-bold">12こ</span> あります</p>
+                            <p class="text-2xl text-gray-700 mb-4"><span class="text-blue-500 font-bold">3にん</span> で おなじかずずつ わけると…</p>
+                            <p class="text-2xl text-gray-700">ひとり <span class="text-green-500 font-bold text-3xl">なんこ</span> もらえるかな？</p>
+                        </div>
+                    `
+                },
+                {
+                    title: 'わけてみよう！',
+                    content: `
+                        <div class="text-center">
+                            <div class="grid grid-cols-3 gap-4 mb-6">
+                                <div class="bg-red-50 rounded-xl p-3">
+                                    <div class="text-3xl mb-1">😊</div>
+                                    <div class="text-2xl">🍎🍎🍎🍎</div>
+                                    <div class="text-sm text-gray-600 mt-1">4こ</div>
+                                </div>
+                                <div class="bg-blue-50 rounded-xl p-3">
+                                    <div class="text-3xl mb-1">😊</div>
+                                    <div class="text-2xl">🍎🍎🍎🍎</div>
+                                    <div class="text-sm text-gray-600 mt-1">4こ</div>
+                                </div>
+                                <div class="bg-green-50 rounded-xl p-3">
+                                    <div class="text-3xl mb-1">😊</div>
+                                    <div class="text-2xl">🍎🍎🍎🍎</div>
+                                    <div class="text-sm text-gray-600 mt-1">4こ</div>
+                                </div>
+                            </div>
+                            <p class="text-2xl font-bold text-gray-800">
+                                12 ÷ 3 = <span class="text-green-500">4</span>
+                            </p>
+                            <p class="text-lg text-gray-600 mt-2">ひとり 4こ ずつ！</p>
+                        </div>
+                    `
+                },
+                {
+                    title: 'かけ算で かんがえよう！',
+                    content: `
+                        <div class="text-center">
+                            <p class="text-xl text-gray-700 mb-6">わり算は かけ算の ぎゃくだよ！</p>
+                            <div class="bg-yellow-50 rounded-2xl p-6 mb-4">
+                                <p class="text-2xl font-bold text-gray-800 mb-2">12 ÷ 3 = ？</p>
+                                <p class="text-xl text-gray-600">↓ こう かんがえる！</p>
+                                <p class="text-2xl font-bold text-blue-600 mt-2">3 × ？ = 12</p>
+                                <p class="text-xl text-gray-600 mt-2">3のだんを おもいだそう！</p>
+                                <p class="text-2xl font-bold text-green-600 mt-2">3 × 4 = 12 → こたえは <span class="text-3xl">4</span>！</p>
+                            </div>
+                            <p class="text-lg text-gray-600">九九が わかれば わり算も できる！</p>
+                        </div>
+                    `
+                },
+                {
+                    title: 'じゃあ れんしゅうしてみよう！',
+                    content: `
+                        <div class="text-center">
+                            <div class="text-8xl mb-6">🎯</div>
+                            <p class="text-2xl text-gray-700 mb-4">まず <span class="text-blue-500 font-bold">わる数</span> の だんの 九九を おもいだして、</p>
+                            <p class="text-2xl text-gray-700 mb-4">こたえが <span class="text-red-500 font-bold">わられる数</span> に なるものを さがそう！</p>
+                            <div class="bg-green-50 rounded-2xl p-4 mt-4">
+                                <p class="text-xl text-green-700 font-bold">ゆっくりでいい！まちがえても OK！</p>
+                            </div>
+                        </div>
+                    `
+                }
+            ];
+
+            const slide = slides[state.lessonSlide || 0];
+            const slideIndex = state.lessonSlide || 0;
+            const isLast = slideIndex === slides.length - 1;
+
+            return `
+                <div class="min-h-screen bg-gradient-to-b from-yellow-50 to-orange-100 p-4">
+                    <div class="max-w-2xl mx-auto">
+                        <div class="flex justify-between items-center mb-6">
+                            <button onclick="goHome()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl text-lg font-bold">◀ もどる</button>
+                            <div class="text-xl text-gray-600 font-bold">${slideIndex + 1} / ${slides.length}</div>
+                        </div>
+
+                        <div class="bg-white rounded-3xl shadow-xl p-8 mb-6">
+                            <h2 class="text-3xl font-bold text-center mb-8 text-orange-600">${slide.title}</h2>
+                            ${slide.content}
+                        </div>
+
+                        <div class="flex gap-4">
+                            ${slideIndex > 0 ? `
+                                <button onclick="lessonPrev()" class="flex-1 bg-gray-400 hover:bg-gray-500 text-white text-xl font-bold py-4 rounded-xl">
+                                    ◀ まえへ
+                                </button>
+                            ` : '<div class="flex-1"></div>'}
+
+                            ${isLast ? `
+                                <button onclick="startQuiz('wari', 10)" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-xl font-bold py-4 rounded-xl">
+                                    れんしゅう スタート！🎯
+                                </button>
+                            ` : `
+                                <button onclick="lessonNext()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-xl font-bold py-4 rounded-xl">
+                                    つぎへ ▶
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function lessonNext() {
+            state.lessonSlide = (state.lessonSlide || 0) + 1;
+            render();
+        }
+
+        function lessonPrev() {
+            state.lessonSlide = Math.max(0, (state.lessonSlide || 0) - 1);
+            render();
+        }
+
         // ナビゲーション
         function goHome() {
             state.screen = 'home';
@@ -685,6 +851,12 @@
 
         function goToStats() {
             state.screen = 'stats';
+            render();
+        }
+
+        function goToLesson() {
+            state.screen = 'lesson';
+            state.lessonSlide = 0;
             render();
         }
 
